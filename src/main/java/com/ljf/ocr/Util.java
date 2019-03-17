@@ -27,16 +27,15 @@ public class Util {
 		}
 	}
 	
-	/**鑾峰彇classpath*/
+	/**��ȡclasspath*/
 	public static String getClassPath() {
 		String classPath = Thread.currentThread().getContextClassLoader().getResource("").getPath();
-		System.out.println("classpath:" + classPath);
         String rootPath = "";
-        //windows涓�
+        //windows
         if ("\\".equals(File.separator)) {
             rootPath = classPath.substring(1);
         }
-        //linux涓�
+        //linux
         if ("/".equals(File.separator)) {
         	rootPath = classPath;
         }

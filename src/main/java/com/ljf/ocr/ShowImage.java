@@ -31,7 +31,7 @@ public class ShowImage {
         frame.setBounds(100, 100, mat.width()+15, mat.height()+37);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.getContentPane().setLayout(null);
-        BufferedImage image=new MatToBufImg(mat, ".jpg").getImage();
+        BufferedImage image = ImgUtil.Mat2BufImg(mat, ".jpg");
         JLabel label = new JLabel(""){
             @Override
             public void setLabelFor(Component c) {

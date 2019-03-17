@@ -1,5 +1,6 @@
 package com.ljf.ocr;
 
+import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -12,6 +13,8 @@ import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.Transparency;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -19,6 +22,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
@@ -31,25 +35,276 @@ import javax.swing.ImageIcon;
 import net.sourceforge.tess4j.ITesseract;
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
+
+import org.opencv.core.Core;
+import org.opencv.core.Mat;
+import org.opencv.core.MatOfByte;
+import org.opencv.core.MatOfPoint;
+import org.opencv.core.Point;
+import org.opencv.core.Rect;
+import org.opencv.core.Size;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 宸ュ叿绫�
+ * 图片工具栏
  * @author ljf
  * @since 2019-03-14
  */
 public class ImgUtil {
 
     private static Logger logger = LoggerFactory.getLogger("ImgUtil");
+    
+//    static{
+//		//载入本地库
+//    	String opencvLib = Util.getClassPath() + "opencv/dll/opencv_java320.dll";
+//        System.load(opencvLib);
+//	}
 
+	public static void autoCrop(String imgPath){
+		
+		//原图
+		Mat src = Imgcodecs.imread(imgPath);
+		//原图（灰）
+		Mat srcGray = src.clone();
+		Imgproc.cvtColor(srcGray, srcGray, Imgproc.COLOR_BGR2GRAY);
+        //高斯滤波，降噪
+        Imgproc.GaussianBlur(srcGray, srcGray, new Size(3, 3), 0);
+        //轮廓检测
+        Imgproc.Canny(srcGray, srcGray, 100, 100);
+        //轮廓提取
+        List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
+        Mat hierarchy = new Mat();
+        Imgproc.findContours(srcGray, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+        //找出最大轮廓
+        double maxArea = 0;
+        //最大轮廓索引
+        int maxIndex = 0;
+        for(int i = 0;i < contours.size();i ++){
+        	Rect br = Imgproc.boundingRect(contours.get(i));
+        	if(maxArea < br.area()){
+        		maxArea = br.area();
+        		maxIndex = i;
+        	}
+        }
+        //最大轮廓
+        Rect maxContour = Imgproc.boundingRect(contours.get(maxIndex));
+        Mat srcImg = new Mat(src, maxContour);
+        Mat tmpImg = new Mat();
+        srcImg.copyTo(tmpImg);
+        Imgcodecs.imwrite("H:/opencv/test/" + new Date().getTime() + ".jpg", tmpImg);
+        Imgcodecs.imwrite("H:/opencv/test/" + new Date().getTime() + ".jpg", srcGray);
+	}
+	
+	/**
+	 * 灰化
+	 * @param srcPath
+	 * @return	
+	 */
+	public static Mat gray(String srcPath){
+		Mat srcGray = Imgcodecs.imread(srcPath, Imgcodecs.IMREAD_GRAYSCALE);
+		Mat dst = new Mat();
+		Imgproc.cvtColor(srcGray, dst, Imgproc.THRESH_OTSU);//使用OTSU界定输入图像
+//		Imgcodecs.imwrite(dstPath, dst);
+		return dst;
+	}
+	
+	/**
+	 * 二值化
+	 * @param src
+	 * @param gray
+	 * @return
+	 */
+	public static Mat binarize(Mat src,Mat gray){
+		Mat m = new Mat();
+		Imgproc.cvtColor(src, gray, Imgproc.COLOR_RGB2GRAY);
+		Mat dst = new Mat();
+		Imgproc.threshold(gray, dst, 100, 255, 4);//去水印
+		Imgproc.threshold(dst, m, 0, 255, 0);//二值化
+		Imgproc.GaussianBlur(m, m, new Size(3, 3), 0);
+//		Imgcodecs.imwrite("H:/opencv/test-binary.jpg", m);
+		return m;
+	}
+	
+	/**
+	 * 膨胀
+	 * @param src
+	 * @return
+	 */
+	public static Mat dilate(Mat src,int threshold){
+		Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_CROSS,new Size(3,3));     //使用3*3交叉内核
+		Mat dilated = new Mat();
+		Imgproc.dilate(src, dilated, kernel, new Point(-1, -1), threshold);   //以这个内核为中心膨胀8倍
+		//具体的内核大小和膨胀倍数根据实际情况而定，只要确保所有字符都粘在一起即可
+//		Imgcodecs.imwrite("H:/opencv/test-dilate.jpg", dilated);
+		return dilated;
+	}
+	
+	public static void findContours(Mat srcDilate,Mat src){
+		ArrayList<MatOfPoint> contours = new ArrayList<MatOfPoint>();
+		Mat hierarchy = new Mat();
+		Imgproc.findContours(srcDilate, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+		List<MatOfPoint> sortMat = sortMat(contours);
+		for(int i = 0;i < sortMat.size();i ++){
+        	Rect rect = Imgproc.boundingRect(sortMat.get(i));
+            Mat srcImg = new Mat(src, rect);
+            Mat tmpImg = new Mat();
+            srcImg.copyTo(tmpImg);
+            String storagePath = "H:/opencv/test/" + i + ".jpg";
+            Imgcodecs.imwrite(storagePath, tmpImg);
+            ocr(storagePath);
+        }
+	}
+	
+	/**
+	 * 排序
+	 * @param contours
+	 * @return
+	 */
+	public static List<MatOfPoint> sortMat(ArrayList<MatOfPoint> contours){
+		for(int a = 0;a < contours.size();a ++){
+			Rect rect1 = Imgproc.boundingRect(contours.get(a));
+			for(int b = 0;b < contours.size();b ++){
+				Rect rect2 = Imgproc.boundingRect(contours.get(b));
+				if(sort(rect1,rect2)){
+					MatOfPoint temp = contours.get(a);
+					contours.set(a, contours.get(b));
+					contours.set(b, temp);
+				}
+			}
+		}
+		return contours;
+	}
+	
+	/**
+	 * 排序规则
+	 * @param a
+	 * @param b
+	 * @return
+	 */
+	public static boolean sort(Rect a,Rect b){
+		if(a.y < b.y){
+			return true;
+		}else if(a.y == b.y){
+			return (a.x < b.x);
+		}else{
+			return false;
+		}
+	}
+	
+	/**
+	 * 二值化（动态）
+	 * @param srcImg
+	 * @param desImg
+	 */
+	public static Mat binarization(String src, Mat dst) {
+		Mat img = Imgcodecs.imread(src);
+		Imgproc.cvtColor(img, dst, Imgproc.COLOR_RGB2GRAY);
+        Imgproc.adaptiveThreshold(dst, dst, 255, Imgproc.ADAPTIVE_THRESH_MEAN_C, Imgproc.THRESH_BINARY_INV, 5, 10);
+//        Imgcodecs.imwrite("H:/opencv/test-binary.jpg", dst);
+        return dst;
+    }
+	
+	public static boolean isBlack(int colorInt)  
+    {  
+        Color color = new Color(colorInt);  
+        if (color.getRed() + color.getGreen() + color.getBlue() <= 300)  
+        {  
+            return true;  
+        }  
+        return false;  
+    }  
+
+    public static boolean isWhite(int colorInt)  
+    {  
+        Color color = new Color(colorInt);  
+        if (color.getRed() + color.getGreen() + color.getBlue() > 300)  
+        {  
+            return true;  
+        }  
+        return false;  
+    }  
+    
+    public static int isBlack(int colorInt, int whiteThreshold) {
+		final Color color = new Color(colorInt);
+		if (color.getRed() + color.getGreen() + color.getBlue() <= whiteThreshold) {
+			return 1;
+		}
+		return 0;
+	}
+	
     /**
-     * 鏍规嵁璁剧疆鐨勫楂樼瓑姣斾緥鍘嬬缉鍥剧墖鏂囦欢<br> 鍏堜繚瀛樺師鏂囦欢锛屽啀鍘嬬缉銆佷笂浼�
-     * @param oldFile  瑕佽繘琛屽帇缂╃殑鏂囦欢
-     * @param newFile  鏂版枃浠�
-     * @param width  瀹藉害 //璁剧疆瀹藉害鏃讹紙楂樺害浼犲叆0锛岀瓑姣斾緥缂╂斁锛�
-     * @param height 楂樺害 //璁剧疆楂樺害鏃讹紙瀹藉害浼犲叆0锛岀瓑姣斾緥缂╂斁锛�
-     * @return 杩斿洖鍘嬬缉鍚庣殑鏂囦欢鐨勫叏璺緞
+     * Mat转换成BufferedImage
+     *
+     * @param matrix
+     *            要转换的Mat
+     * @param fileExtension
+     *            格式为 ".jpg", ".png", etc
+     * @return
+     */
+    public static BufferedImage Mat2BufImg (Mat matrix, String fileExtension) {
+        // convert the matrix into a matrix of bytes appropriate for
+        // this file extension
+        MatOfByte mob = new MatOfByte();
+        Imgcodecs.imencode(fileExtension, matrix, mob);
+        // convert the "matrix of bytes" into a byte array
+        byte[] byteArray = mob.toArray();
+        BufferedImage bufImage = null;
+        try {
+            InputStream in = new ByteArrayInputStream(byteArray);
+            bufImage = ImageIO.read(in);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return bufImage;
+    }
+ 
+    /**
+     * BufferedImage转换成Mat
+     *
+     * @param original
+     *            要转换的BufferedImage
+     * @param imgType
+     *            bufferedImage的类型 如 BufferedImage.TYPE_3BYTE_BGR
+     * @param matType
+     *            转换成mat的type 如 CvType.CV_8UC3
+     */
+    public static Mat BufImg2Mat (BufferedImage original, int imgType, int matType) {
+        if (original == null) {
+            throw new IllegalArgumentException("original == null");
+        }
+ 
+        // Don't convert if it already has correct type
+        if (original.getType() != imgType) {
+ 
+            // Create a buffered image
+            BufferedImage image = new BufferedImage(original.getWidth(), original.getHeight(), imgType);
+ 
+            // Draw the image onto the new buffer
+            Graphics2D g = image.createGraphics();
+            try {
+                g.setComposite(AlphaComposite.Src);
+                g.drawImage(original, 0, 0, null);
+            } finally {
+                g.dispose();
+            }
+        }
+        DataBufferByte dbi =(DataBufferByte)original.getRaster().getDataBuffer();
+        byte[] pixels = dbi.getData();
+        Mat mat = Mat.eye(original.getHeight(), original.getWidth(), matType);
+        mat.put(0, 0, pixels);
+        return mat;
+    }
+    
+    /**
+     * 图片压缩
+     * @param oldFile
+     * @param newFile
+     * @param width
+     * @param height
+     * @return
      */
     public static int zipImgAuto(InputStream oldFile, File newFile, int width, int height) {
         try {
@@ -96,17 +351,16 @@ public class ImgUtil {
     }
 
     /**
-     * 瑁佸壀鍥剧墖
+     * 图片裁剪
      * @param filePath
      * @param x
      * @param y
      * @param w
      * @param h
-     * @param binaryFlag 鏄惁寮�鍚簩鍊煎寲
+     * @param binaryFlag
      * @return
      */
     public static BufferedImage cropImage(String filePath, int x, int y, int w, int h,boolean binaryFlag){
-        //棣栧厛閫氳繃ImageIo涓殑鏂规硶锛屽垱寤轰竴涓狪mage + InputStream鍒板唴瀛�
         ImageInputStream iis = null;
         try {
             iis = ImageIO.createImageInputStream(new FileInputStream(filePath));
@@ -115,26 +369,18 @@ public class ImgUtil {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        //鍐嶆寜鐓ф寚瀹氭牸寮忔瀯閫犱竴涓猂eader
         Iterator<ImageReader> it = ImageIO.getImageReadersByFormatName("jpg");
         ImageReader imgReader = it.next();
-        // 鍐嶉�氳繃ImageReader缁戝畾 InputStream
         imgReader.setInput(iis);
-        //璁剧疆鎰熷叴瓒ｇ殑婧愬尯鍩�
         ImageReadParam par = imgReader.getDefaultReadParam();
         par.setSourceRegion(new Rectangle(x, y, w, h));
-        //浠� reader寰楀埌BufferImage
         BufferedImage bi = null;
         try {
             bi = imgReader.read(0, par);
-
-            //浜屽�煎寲
+            //是否二值化
             if(binaryFlag){
                 bi = binary(bi,bi);
             }
-
-            //灏咮uffeerImage鍐欏嚭閫氳繃ImageIO 娴嬭瘯鐢�
-//			ImageIO.write(bi, "jpg", new File(Constants.getFileUploadPath() + "/1087/test.jpg"));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -142,7 +388,7 @@ public class ImgUtil {
     }
 
     /**
-     * 浜屽�煎寲
+     * 二值化
      * @param src
      * @param dest
      * @return
@@ -166,9 +412,9 @@ public class ImgUtil {
                 tg = (inPixels[index] >> 8) & 0xff;
                 tb = inPixels[index] & 0xff;
                 if (tr > means) {
-                    tr = tg = tb = 255;//鐧�
+                    tr = tg = tb = 255;//黑
                 } else {
-                    tr = tg = tb = 0;//榛�
+                    tr = tg = tb = 0;//白
                 }
                 outPixels[index] = (ta << 24) | (tr << 16) | (tg << 8) | tb;
             }
@@ -212,7 +458,11 @@ public class ImgUtil {
         for (Integer i : data) {
             result += i;
         }
-        return (result / size);
+        if(result != 0 && size != 0){        	
+        	return (result / size);
+        }else{
+        	return 0;
+        }
     }
 
     public static void setRGB(BufferedImage image, int x, int y, int w,int h, int[] pixels) {
@@ -233,9 +483,30 @@ public class ImgUtil {
         }
     }
 
+    public static void ocr(String path){
+    	File file = new File(path);
+        ITesseract instance = new Tesseract();
+        //设置训练库的位置
+        String classPath = Util.getClassPath();
+        String dataPath = classPath + "ocr/tessdata";
+        instance.setDatapath(dataPath);
+        instance.setLanguage("chi_sim");//chi_sim eng
+        String result = null;
+        try {
+        	BufferedImage src = ImageIO.read(file);
+        	BufferedImage binary = binary(src, src);
+        	ImageIO.write(src, "jpg", new File("H:/opencv/binary/" + new Date().getTime() + ".jpg"));
+            result =  instance.doOCR(binary);
+        } catch (TesseractException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+			e.printStackTrace();
+		}
+        System.out.println(result);
+    }
+    
     public static String ocr(BufferedImage img){
         ITesseract instance = new Tesseract();
-        //璁剧疆璁粌搴撶殑浣嶇疆
         String classPath = Util.getClassPath();
         String dataPath = classPath + "ocr/tessdata";
         logger.info("Tesseract-OCR tessdata:{}",dataPath);
@@ -253,7 +524,6 @@ public class ImgUtil {
 
     public static String ocr(File img){
         ITesseract instance = new Tesseract();
-        //璁剧疆璁粌搴撶殑浣嶇疆
         String classPath = Util.getClassPath();
         String dataPath = classPath + "ocr/tessdata";
         logger.info("Tesseract-OCR tessdata:{}",dataPath);
@@ -270,7 +540,7 @@ public class ImgUtil {
     }
 
     /**
-     * 鎶婂師鍥捐浆鎹㈡垚浜岃繘鍒�
+     * inputStream转换为字节数组
      * @param input
      * @return
      */
@@ -296,7 +566,7 @@ public class ImgUtil {
     }
 
     /**
-     * 鎶婁簩杩涘埗杞崲鎴愬浘鐗�
+     * 字节数组转换为BufferedImage
      * @param imagedata
      * @return
      */
@@ -325,4 +595,9 @@ public class ImgUtil {
         return bimage;
     }
 
+    public static void window(Mat mat){
+    	ShowImage window = new ShowImage(mat);
+        window.getFrame().setVisible(true);
+    }
+    
 }
