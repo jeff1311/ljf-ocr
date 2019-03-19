@@ -1,12 +1,11 @@
 package com.ljf.ocr;
 
+import com.alibaba.fastjson.JSONObject;
+
+import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-
-import javax.servlet.http.HttpServletResponse;
-
-import com.alibaba.fastjson.JSONObject;
 
 public class Util {
 
@@ -27,7 +26,7 @@ public class Util {
 		}
 	}
 	
-	/**ªÒ»°classpath*/
+	/**Ëé∑Âèñclasspath*/
 	public static String getClassPath() {
 		String classPath = Thread.currentThread().getContextClassLoader().getResource("").getPath();
         String rootPath = "";

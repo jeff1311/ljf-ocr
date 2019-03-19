@@ -1,52 +1,28 @@
 package com.ljf.ocr;
 
-import java.awt.AlphaComposite;
-import java.awt.Color;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.GraphicsConfiguration;
-import java.awt.GraphicsDevice;
-import java.awt.GraphicsEnvironment;
-import java.awt.HeadlessException;
-import java.awt.Image;
-import java.awt.Rectangle;
-import java.awt.Toolkit;
-import java.awt.Transparency;
-import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferByte;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.List;
+import net.sourceforge.tess4j.ITesseract;
+import net.sourceforge.tess4j.Tesseract;
+import net.sourceforge.tess4j.TesseractException;
+import org.opencv.core.*;
+import org.opencv.core.Point;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReadParam;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
-import javax.swing.ImageIcon;
-
-import net.sourceforge.tess4j.ITesseract;
-import net.sourceforge.tess4j.Tesseract;
-import net.sourceforge.tess4j.TesseractException;
-
-import org.opencv.core.Core;
-import org.opencv.core.Mat;
-import org.opencv.core.MatOfByte;
-import org.opencv.core.MatOfPoint;
-import org.opencv.core.Point;
-import org.opencv.core.Rect;
-import org.opencv.core.Size;
-import org.opencv.imgcodecs.Imgcodecs;
-import org.opencv.imgproc.Imgproc;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
 
 /**
  * 图片工具栏
@@ -94,8 +70,8 @@ public class ImgUtil {
         Mat srcImg = new Mat(src, maxContour);
         Mat tmpImg = new Mat();
         srcImg.copyTo(tmpImg);
-        Imgcodecs.imwrite("H:/opencv/test/" + new Date().getTime() + ".jpg", tmpImg);
-        Imgcodecs.imwrite("H:/opencv/test/" + new Date().getTime() + ".jpg", srcGray);
+        Imgcodecs.imwrite("E:/ocr/test/" + new Date().getTime() + ".jpg", tmpImg);
+        Imgcodecs.imwrite("E:/ocr/test/" + new Date().getTime() + ".jpg", srcGray);
 	}
 	
 	/**
@@ -142,7 +118,8 @@ public class ImgUtil {
 		return dilated;
 	}
 	
-	public static void findContours(Mat srcDilate,Mat src){
+	public static String findContours(Mat srcDilate,Mat src){
+	    String result = "";
 		ArrayList<MatOfPoint> contours = new ArrayList<MatOfPoint>();
 		Mat hierarchy = new Mat();
 		Imgproc.findContours(srcDilate, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
@@ -152,10 +129,11 @@ public class ImgUtil {
             Mat srcImg = new Mat(src, rect);
             Mat tmpImg = new Mat();
             srcImg.copyTo(tmpImg);
-            String storagePath = "H:/opencv/test/" + i + ".jpg";
+            String storagePath = "E:/ocr/test/" + i + ".jpg";
             Imgcodecs.imwrite(storagePath, tmpImg);
-            ocr(storagePath);
+            result = result + ocr(storagePath) + "<br>";
         }
+        return result;
 	}
 	
 	/**
@@ -196,8 +174,8 @@ public class ImgUtil {
 	
 	/**
 	 * 二值化（动态）
-	 * @param srcImg
-	 * @param desImg
+	 * @param src
+	 * @param dst
 	 */
 	public static Mat binarization(String src, Mat dst) {
 		Mat img = Imgcodecs.imread(src);
@@ -448,7 +426,7 @@ public class ImgUtil {
             sub2.clear();
             iniThreshold = (means1 + means2) / 2;
         }
-        finalThreshold -= 10;
+        finalThreshold -= 20;
         return finalThreshold;
     }
 
@@ -483,7 +461,7 @@ public class ImgUtil {
         }
     }
 
-    public static void ocr(String path){
+    public static String ocr(String path){
     	File file = new File(path);
         ITesseract instance = new Tesseract();
         //设置训练库的位置
@@ -495,7 +473,7 @@ public class ImgUtil {
         try {
         	BufferedImage src = ImageIO.read(file);
         	BufferedImage binary = binary(src, src);
-        	ImageIO.write(src, "jpg", new File("H:/opencv/binary/" + new Date().getTime() + ".jpg"));
+        	ImageIO.write(src, "jpg", new File("E:/ocr/binary/" + new Date().getTime() + ".jpg"));
             result =  instance.doOCR(binary);
         } catch (TesseractException e) {
             e.printStackTrace();
@@ -503,6 +481,7 @@ public class ImgUtil {
 			e.printStackTrace();
 		}
         System.out.println(result);
+        return result;
     }
     
     public static String ocr(BufferedImage img){

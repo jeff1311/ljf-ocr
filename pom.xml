@@ -7,8 +7,19 @@
     <groupId>com.ljf</groupId>
     <artifactId>ljf-ocr</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <packaging>war</packaging>
 
     <dependencies>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.4</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-fileupload</groupId>
+            <artifactId>commons-fileupload</artifactId>
+            <version>1.2.2</version>
+        </dependency>
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>fastjson</artifactId>
@@ -61,6 +72,12 @@
                     <include>opencv/**/*.*</include>
                 </includes>
             </resource>
+            <resource>
+                <directory>src/main/webapp</directory>
+                <includes>
+                    <include>*</include>
+                </includes>
+            </resource>
         </resources>
         <plugins>
             <plugin>
@@ -70,6 +87,17 @@
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>2.2</version>
+                <configuration>
+                    <!-- 指定web.xml的路径  -->
+                    <webXml>src/main/webapp/WEB_INF/web.xml</webXml>
+                    <!-- 指定jsp、js、css的路劲 -->
+                    <warSourceDirectory>src/main/webapp</warSourceDirectory>
                 </configuration>
             </plugin>
         </plugins>
