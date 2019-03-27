@@ -62,9 +62,12 @@ function ocr(file){
         processData: false, // 默认 | 不处理数据
         contentType: false,// 默认 | 不设置内容类型
         dataType: 'json',
+        beforeSend:function(){
+            $('#ocrtext').text('正在识别......');
+		},
         success: function(json){
             console.log(json);
-            $('#ocrtext').text(json.ocrtext);
+            $('#ocrtext').html(json.ocrtext);
         }
     })
 }

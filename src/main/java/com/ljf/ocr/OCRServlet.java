@@ -39,7 +39,7 @@ public class OCRServlet extends HttpServlet {
         ImageIO.write(img, "jpg", new File("E:/ocr/" + storagePath + tempPath));
 //        String ocrtext = ImgUtil.ocr(img);
 
-        String ocrtext = OCR.ocr("E:/ocr/" + storagePath + tempPath,false);
+        String ocrtext = OCR.ocr("E:/ocr/" + storagePath + tempPath,true);
         System.out.println(ocrtext);
         JSONObject json = new JSONObject();
         json.put("code", 200);
